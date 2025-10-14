@@ -1071,7 +1071,7 @@ function ImageGeneratorSelector({
               className="cursor-pointer"
             >
               <GeminiIcon className="mr-2 size-4" />
-              Gemini (Nano Banana)
+              OpenRouter Gemini 2.5 Flash Image
             </DropdownMenuItem>
             <DropdownMenuItem
               disabled={modelInfo?.isToolCallUnsupported}

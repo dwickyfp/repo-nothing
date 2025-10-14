@@ -100,11 +100,8 @@ export const nanoBananaTool = createTool({
       return {
         images: resultImages,
         mode,
-        model: "gemini-2.5-flash-image",
-        guide:
-          resultImages.length > 0
-            ? "The image has been successfully generated and is now displayed above. If you need any edits, modifications, or adjustments to the image, please let me know."
-            : "I apologize, but the image generation was not successful. To help me create a better image for you, could you please provide more specific details about what you'd like to see? For example:\n\n• What style are you looking for? (realistic, cartoon, abstract, etc.)\n• What colors or mood should the image have?\n• Are there any specific objects, people, or scenes you want included?\n• What size or format would work best for your needs?\n\nPlease share these details and I'll try generating the image again with your specifications.",
+        model: "OpenRouter / Google Gemini 2.5 Flash Image",
+        guide: `Use the generated image in your response or ask for modifications if needed. The image was generated in ${mode} mode.`,
       };
     } catch (e) {
       logger.error(e);

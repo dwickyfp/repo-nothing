@@ -1,0 +1,27 @@
+version: "3.9"
+
+networks:
+  ai-net:
+    name: ai-net
+    driver: bridge
+
+services:
+  postgres-db:
+    container_name: postgres_db
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "5678:5432"
+    restart: unless-stopped
+    networks: [ai-net]
+
+  redis:
+    container_name: redis_source
+    image: redis:7
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    networks: [ai-net]
