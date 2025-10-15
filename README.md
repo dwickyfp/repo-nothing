@@ -316,17 +316,23 @@ EXA_API_KEY=your_exa_api_key_here
 FILE_BASED_MCP_CONFIG=false
 
 # === File Storage ===
-# Vercel Blob is the default storage driver (works in both local dev and production)
-# Pull the token locally with `vercel env pull`
-FILE_STORAGE_TYPE=vercel-blob
+# Select storage driver: VERCEL (default) or S3
+STORAGE_TYPE=VERCEL
 FILE_STORAGE_PREFIX=uploads
+
+# Vercel Blob (default)
+# Pull the token locally with `vercel env pull`
 BLOB_READ_WRITE_TOKEN=
 
-# -- S3 (coming soon) --
-# FILE_STORAGE_TYPE=s3
-# FILE_STORAGE_PREFIX=uploads
-# FILE_STORAGE_S3_BUCKET=
-# FILE_STORAGE_S3_REGION=
+# S3 / MinIO example configuration
+# STORAGE_TYPE=S3
+# FILE_STORAGE_S3_BUCKET=better-chatbot-files
+# FILE_STORAGE_S3_REGION=us-east-1
+# S3_ENDPOINT=http://localhost:9000          # Optional: MinIO endpoint
+# S3_PUBLIC_URL=http://localhost:9000/better-chatbot-files # Optional: public URL base
+# S3_ACCESS_KEY_ID=
+# S3_SECRET_ACCESS_KEY=
+# S3_FORCE_PATH_STYLE=true                   # Recommended for MinIO
 
 # (Optional)
 # === OAuth Settings ===
@@ -378,7 +384,7 @@ Step-by-step setup guides for running and configuring better-chatbot.
 
 #### [🗂️ File Storage Drivers](./docs/tips-guides/file-storage.md)
 
-- Cloud-based file storage with Vercel Blob (default) for seamless uploads in both development and production. S3 support coming soon.
+- Cloud-based file storage with Vercel Blob (default) and S3/MinIO compatibility for uploads in development and production.
 
 #### [🎯 System Prompts & Chat Customization](./docs/tips-guides/system-prompts-and-customization.md)
 

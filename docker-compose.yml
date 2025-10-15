@@ -25,3 +25,16 @@ services:
       - "6379:6379"
     restart: unless-stopped
     networks: [ai-net]
+
+  minio:
+    image: minio/minio
+    container_name: minio
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+      - MINIO_DOMAIN=minio
+    networks: [ai-net]
+    ports:
+      - 9001:9001
+      - 9000:9000
+    command: ["server", "/data", "--console-address", ":9001"]

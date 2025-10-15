@@ -5,6 +5,7 @@ import { upload as uploadToVercelBlob } from "@vercel/blob/client";
 import useSWR from "swr";
 import { toast } from "sonner";
 import { getStorageInfoAction } from "@/app/api/storage/actions";
+import { buildStorageProxyUrl } from "lib/file-storage/storage-paths";
 
 // Types
 interface StorageInfo {
@@ -20,6 +21,7 @@ interface UploadOptions {
 interface UploadResult {
   pathname: string;
   url: string;
+  storageUrl?: string;
   contentType?: string;
   size?: number;
 }
@@ -93,6 +95,51 @@ export function useFileUpload() {
         return;
       }
 
+      const normalizeResult = (result?: UploadResult | undefined) => {
+        if (!result) return result;
+        if (storageType === "s3") {
+          return {
+            ...result,
+            storageUrl: result.storageUrl ?? result.url,
+          };
+        }
+        return result;
+      };
+
+      const uploadViaServer = async () => {
+        const formData = new FormData();
+        formData.append("file", file);
+
+        const serverUploadResponse = await fetch("/api/storage/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!serverUploadResponse.ok) {
+          const errorBody = await serverUploadResponse.json().catch(() => ({}));
+
+          if (errorBody.solution) {
+            toast.error(errorBody.error || "Server upload failed", {
+              description: errorBody.solution,
+              duration: 10000, // Show for 10 seconds
+            });
+          } else {
+            toast.error(errorBody.error || "Server upload failed");
+          }
+          return;
+        }
+
+        const result = await serverUploadResponse.json();
+
+        return normalizeResult({
+          pathname: result.key,
+          url: buildStorageProxyUrl(result.key, { absolute: true }),
+          storageUrl: result.url,
+          contentType: result.metadata?.contentType,
+          size: result.metadata?.size,
+        });
+      };
+
       setIsUploading(true);
       try {
         // Vercel Blob direct upload
@@ -103,12 +150,13 @@ export function useFileUpload() {
             contentType,
           });
 
-          return {
+          return normalizeResult({
             pathname: blob.pathname,
             url: blob.url,
+            storageUrl: blob.url,
             contentType: blob.contentType,
             size: file.size,
-          };
+          });
         }
 
         // S3 or other direct upload (future)
@@ -137,6 +185,14 @@ export function useFileUpload() {
 
           const uploadUrlData = await uploadUrlResponse.json();
 
+          if (
+            !uploadUrlData ||
+            uploadUrlData.directUploadSupported === false ||
+            !uploadUrlData.url
+          ) {
+            return await uploadViaServer();
+          }
+
           // Upload to presigned URL
           const uploadResponse = await fetch(uploadUrlData.url, {
             method: uploadUrlData.method || "PUT",
@@ -149,46 +205,25 @@ export function useFileUpload() {
             return;
           }
 
-          return {
+          const publicUrl =
+            typeof uploadUrlData.sourceUrl === "string" &&
+            uploadUrlData.sourceUrl.length > 0
+              ? uploadUrlData.sourceUrl
+              : uploadUrlData.url;
+
+          return normalizeResult({
             pathname: uploadUrlData.key,
-            url: uploadUrlData.url,
+            url: buildStorageProxyUrl(uploadUrlData.key, {
+              absolute: true,
+            }),
+            storageUrl: uploadUrlData.sourceUrl ?? publicUrl,
             contentType,
             size: file.size,
-          };
+          });
         }
 
         // Fallback: Server upload (Local FS)
-        const formData = new FormData();
-        formData.append("file", file);
-
-        const serverUploadResponse = await fetch("/api/storage/upload", {
-          method: "POST",
-          body: formData,
-        });
-
-        if (!serverUploadResponse.ok) {
-          const errorBody = await serverUploadResponse.json().catch(() => ({}));
-
-          // Display detailed error with solution if available
-          if (errorBody.solution) {
-            toast.error(errorBody.error || "Server upload failed", {
-              description: errorBody.solution,
-              duration: 10000, // Show for 10 seconds
-            });
-          } else {
-            toast.error(errorBody.error || "Server upload failed");
-          }
-          return;
-        }
-
-        const result = await serverUploadResponse.json();
-
-        return {
-          pathname: result.key,
-          url: result.url,
-          contentType: result.metadata?.contentType,
-          size: result.metadata?.size,
-        };
+        return await uploadViaServer();
       } catch (error: unknown) {
         const message =
           error instanceof Error ? error.message : "Upload failed";

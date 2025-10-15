@@ -68,6 +68,7 @@ const staticModels = {
     "deepseek-v3:free": openrouter("deepseek/deepseek-chat-v3-0324:free"),
     "gemini-2.0-flash-exp:free": openrouter("google/gemini-2.0-flash-exp:free"),
     "grok-4-fast": openrouter("x-ai/grok-4-fast"),
+    "gemini-2.5-pro": openrouter("google/gemini-2.5-pro"),
   },
 };
 
@@ -88,6 +89,7 @@ const staticSupportImageInputModels = {
   ...staticModels.xai,
   ...staticModels.openai,
   ...staticModels.anthropic,
+  ...staticModels.openRouter,
 };
 
 const openaiCompatibleProviders = openaiCompatibleModelsSafeParse(

@@ -47,12 +47,26 @@ export async function checkStorageAction(): Promise<StorageCheckResult> {
 
   // 2. Check S3 configuration
   if (storageDriver === "s3") {
+    const bucket =
+      process.env.FILE_STORAGE_S3_BUCKET ??
+      process.env.S3_BUCKET ??
+      process.env.MINIO_BUCKET;
+
+    if (!bucket) {
+      return {
+        isValid: false,
+        error: "S3 bucket is not configured",
+        solution:
+          "Set FILE_STORAGE_S3_BUCKET (or S3_BUCKET) with your bucket name.\n" +
+          "Example:\n" +
+          "STORAGE_TYPE=S3\n" +
+          "FILE_STORAGE_S3_BUCKET=better-chatbot-files\n" +
+          "FILE_STORAGE_S3_REGION=us-east-1",
+      };
+    }
+
     return {
-      isValid: false,
-      error: "S3 storage is not yet implemented",
-      solution:
-        "S3 storage support is coming soon.\n" +
-        "For now, please use Vercel Blob (default)",
+      isValid: true,
     };
   }
 
@@ -62,9 +76,7 @@ export async function checkStorageAction(): Promise<StorageCheckResult> {
       isValid: false,
       error: `Invalid storage driver: ${storageDriver}`,
       solution:
-        "FILE_STORAGE_TYPE must be one of:\n" +
-        "- 'vercel-blob' (default)\n" +
-        "- 's3' (coming soon)",
+        "STORAGE_TYPE must be one of:\n" + "- 'VERCEL' (default)\n" + "- 'S3'",
     };
   }
 

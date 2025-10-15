@@ -13,7 +13,7 @@ Files are stored with **public access** by default, making them accessible via U
 The project supports two storage backends:
 
 - **Vercel Blob** - Default for all deployments (recommended)
-- **S3** - Planned for AWS/S3-compatible storage
+- **S3** - AWS/S3-compatible storage (MinIO, etc.)
 
 **Vercel Blob** is the default storage driver and works seamlessly in both local development and production environments.
 
@@ -22,21 +22,24 @@ The project supports two storage backends:
 ### Environment Variables
 
 ```ini
-# Storage driver selection (defaults to vercel-blob)
-FILE_STORAGE_TYPE=vercel-blob # or s3 (coming soon)
+# Storage driver selection (defaults to VERCEL)
+STORAGE_TYPE=VERCEL # or S3
 
 # Optional: Subdirectory prefix for organizing files
 FILE_STORAGE_PREFIX=uploads
 
-# === Vercel Blob (FILE_STORAGE_TYPE=vercel-blob) ===
+# === Vercel Blob (STORAGE_TYPE=VERCEL) ===
 BLOB_READ_WRITE_TOKEN=<auto on Vercel>
 VERCEL_BLOB_CALLBACK_URL= # Optional: For local webhook testing with ngrok
 
-# === S3 (FILE_STORAGE_TYPE=s3, not yet implemented) ===
-# FILE_STORAGE_S3_BUCKET=
-# FILE_STORAGE_S3_REGION=
-# AWS_ACCESS_KEY_ID=
-# AWS_SECRET_ACCESS_KEY=
+# === S3 / MinIO (STORAGE_TYPE=S3) ===
+FILE_STORAGE_S3_BUCKET=better-chatbot-files
+FILE_STORAGE_S3_REGION=us-east-1
+S3_ENDPOINT=http://localhost:9000          # Optional: MinIO endpoint
+S3_PUBLIC_URL=http://localhost:9000/better-chatbot-files # Optional: public base URL
+S3_ACCESS_KEY_ID=
+S3_SECRET_ACCESS_KEY=
+S3_FORCE_PATH_STYLE=true                   # Recommended for MinIO
 ```
 
 ### Quick Start with Vercel Blob
@@ -59,7 +62,7 @@ That's it! File uploads will now work seamlessly in both development and product
 The `useFileUpload` hook **automatically selects the optimal upload method** based on your storage backend:
 
 - **Vercel Blob**: Direct browser → CDN upload (fastest, default)
-- **S3**: Presigned URL upload (when implemented)
+- **S3**: Presigned URL upload
 
 ```tsx
 "use client";
@@ -183,7 +186,7 @@ To implement a custom storage driver (e.g., Cloudflare R2, MinIO, S3):
 1. Create a new file in `src/lib/file-storage/` (e.g., `r2-file-storage.ts`)
 2. Implement the `FileStorage` interface from `file-storage.interface.ts`
 3. Add your driver to `index.ts`
-4. Update `FILE_STORAGE_TYPE` environment variable
+4. Update `STORAGE_TYPE` environment variable
 
 The `FileStorage` interface provides:
 
@@ -193,7 +196,7 @@ The `FileStorage` interface provides:
 
 ### Storage Comparison
 
-| Feature              | Vercel Blob         | S3 (Planned)       |
+| Feature              | Vercel Blob         | S3 / MinIO         |
 | -------------------- | ------------------- | ------------------ |
 | Direct Client Upload | ✅ Yes              | ✅ Yes (presigned) |
 | CDN                  | ✅ Global           | Configurable       |

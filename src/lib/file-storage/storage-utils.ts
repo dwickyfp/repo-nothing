@@ -3,6 +3,64 @@ import type { UploadContent } from "./file-storage.interface";
 import logger from "logger";
 import { withTimeout } from "lib/utils";
 
+const MIME_TYPES: Record<string, string> = {
+  // Images
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  gif: "image/gif",
+  webp: "image/webp",
+  svg: "image/svg+xml",
+  ico: "image/x-icon",
+
+  // Documents
+  pdf: "application/pdf",
+  doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xls: "application/vnd.ms-excel",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ppt: "application/vnd.ms-powerpoint",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+
+  // Text
+  txt: "text/plain",
+  html: "text/html",
+  css: "text/css",
+  js: "text/javascript",
+  json: "application/json",
+  xml: "application/xml",
+  csv: "text/csv",
+  md: "text/markdown",
+
+  // Audio
+  mp3: "audio/mpeg",
+  wav: "audio/wav",
+  ogg: "audio/ogg",
+  m4a: "audio/mp4",
+
+  // Video
+  mp4: "video/mp4",
+  webm: "video/webm",
+  avi: "video/x-msvideo",
+  mov: "video/quicktime",
+
+  // Archives
+  zip: "application/zip",
+  rar: "application/x-rar-compressed",
+  "7z": "application/x-7z-compressed",
+  tar: "application/x-tar",
+  gz: "application/gzip",
+};
+
+const EXTENSION_BY_MIME = Object.entries(MIME_TYPES).reduce<
+  Record<string, string>
+>((acc, [ext, mime]) => {
+  if (!acc[mime]) {
+    acc[mime] = ext;
+  }
+  return acc;
+}, {});
+
 export const sanitizeFilename = (filename: string) => {
   const base = filename.split(/[/\\]/).pop() ?? "file";
   return base.replace(/[^a-zA-Z0-9._-]/g, "_") || "file";
@@ -15,56 +73,7 @@ export const sanitizeFilename = (filename: string) => {
 export const getContentTypeFromFilename = (filename: string): string => {
   const ext = filename.split(".").pop()?.toLowerCase();
 
-  const mimeTypes: Record<string, string> = {
-    // Images
-    jpg: "image/jpeg",
-    jpeg: "image/jpeg",
-    png: "image/png",
-    gif: "image/gif",
-    webp: "image/webp",
-    svg: "image/svg+xml",
-    ico: "image/x-icon",
-
-    // Documents
-    pdf: "application/pdf",
-    doc: "application/msword",
-    docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    xls: "application/vnd.ms-excel",
-    xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    ppt: "application/vnd.ms-powerpoint",
-    pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-
-    // Text
-    txt: "text/plain",
-    html: "text/html",
-    css: "text/css",
-    js: "text/javascript",
-    json: "application/json",
-    xml: "application/xml",
-    csv: "text/csv",
-    md: "text/markdown",
-
-    // Audio
-    mp3: "audio/mpeg",
-    wav: "audio/wav",
-    ogg: "audio/ogg",
-    m4a: "audio/mp4",
-
-    // Video
-    mp4: "video/mp4",
-    webm: "video/webm",
-    avi: "video/x-msvideo",
-    mov: "video/quicktime",
-
-    // Archives
-    zip: "application/zip",
-    rar: "application/x-rar-compressed",
-    "7z": "application/x-7z-compressed",
-    tar: "application/x-tar",
-    gz: "application/gzip",
-  };
-
-  return ext && mimeTypes[ext] ? mimeTypes[ext] : "application/octet-stream";
+  return ext && MIME_TYPES[ext] ? MIME_TYPES[ext] : "application/octet-stream";
 };
 
 export const resolveStoragePrefix = () => {
@@ -155,6 +164,26 @@ export const toBuffer = async (content: UploadContent) => {
   }
 
   throw new TypeError("Unsupported upload content type");
+};
+
+export const getExtensionFromContentType = (
+  contentType?: string,
+): string | undefined => {
+  if (!contentType) {
+    return undefined;
+  }
+
+  const normalized = contentType.toLowerCase();
+  if (EXTENSION_BY_MIME[normalized]) {
+    return EXTENSION_BY_MIME[normalized];
+  }
+
+  const fallback = normalized.split("/").pop();
+  if (fallback && fallback.length <= 8) {
+    return fallback.replace(/[^a-z0-9]+/g, "");
+  }
+
+  return undefined;
 };
 
 export async function getBase64Data(image: {

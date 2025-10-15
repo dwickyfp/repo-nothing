@@ -13,7 +13,9 @@ import z from "zod";
 import { ImageToolName } from "..";
 import logger from "logger";
 import { openai } from "@ai-sdk/openai";
-import { toAny } from "lib/utils";
+import { generateUUID, toAny } from "lib/utils";
+import { buildStorageProxyUrl } from "lib/file-storage/storage-paths";
+import { getExtensionFromContentType } from "lib/file-storage/storage-utils";
 
 export type ImageToolResult = {
   images: {
@@ -71,14 +73,20 @@ export const nanoBananaTool = createTool({
         .map((images) => {
           return Promise.all(
             images.map(async (image) => {
+              const extension =
+                getExtensionFromContentType(image.mimeType) ?? "png";
+              const filename = `generated-${generateUUID()}.${extension}`;
               const uploadedImage = await serverFileStorage.upload(
                 Buffer.from(image.base64, "base64"),
                 {
-                  contentType: image.mimeType,
+                  contentType: image.mimeType ?? "image/png",
+                  filename,
                 },
               );
               return {
-                url: uploadedImage.sourceUrl,
+                url: buildStorageProxyUrl(uploadedImage.key, {
+                  absolute: true,
+                }),
                 mimeType: image.mimeType,
               };
             }),
@@ -167,6 +175,7 @@ export const openaiImageTool = createTool({
         const uploadedImage = await serverFileStorage
           .upload(Buffer.from(base64Image, "base64"), {
             contentType: "image/webp",
+            filename: `generated-${generateUUID()}.webp`,
           })
           .catch(() => {
             throw new Error(
@@ -174,7 +183,14 @@ export const openaiImageTool = createTool({
             );
           });
         return {
-          images: [{ url: uploadedImage.sourceUrl, mimeType: "image/webp" }],
+          images: [
+            {
+              url: buildStorageProxyUrl(uploadedImage.key, {
+                absolute: true,
+              }),
+              mimeType: "image/webp",
+            },
+          ],
           mode,
           model: "gpt-image-1-mini",
           guide:

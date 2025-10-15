@@ -177,10 +177,24 @@ const components: Partial<Components> = {
   img: ({ node, children, ...props }) => {
     const { src, alt, ...rest } = props;
 
-    return src ? (
+    if (!src || typeof src !== "string") {
+      return null;
+    }
+
+    const resolvedSrc =
+      typeof window !== "undefined" && src.startsWith("/")
+        ? new URL(src, window.location.origin).href
+        : src;
+
+    return (
       // eslint-disable-next-line @next/next/no-img-element
-      <img className="mx-auto rounded-lg" src={src} alt={alt} {...rest} />
-    ) : null;
+      <img
+        className="mx-auto rounded-lg"
+        src={resolvedSrc}
+        alt={alt}
+        {...rest}
+      />
+    );
   },
 };
 

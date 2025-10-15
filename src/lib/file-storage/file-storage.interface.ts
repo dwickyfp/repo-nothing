@@ -41,6 +41,11 @@ export interface UploadUrl {
   expiresAt: Date;
   headers?: Record<string, string>;
   fields?: Record<string, string>;
+  /**
+   * Publicly accessible URL for the uploaded file (if different from the upload URL).
+   * Useful when using presigned uploads where the PUT/POST URL is not the final read URL.
+   */
+  sourceUrl?: string;
 }
 
 export interface FileStorage {

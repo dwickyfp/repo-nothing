@@ -49,10 +49,186 @@ import { colorize } from "consola/utils";
 import { generateUUID } from "lib/utils";
 import { nanoBananaTool, openaiImageTool } from "lib/ai/tools/image";
 import { ImageToolName } from "lib/ai/tools";
+import { serverFileStorage } from "lib/file-storage";
+import { extractStorageKeyFromUrl } from "lib/file-storage/storage-paths";
+import { FileNotFoundError } from "lib/errors";
 
 const logger = globalLogger.withDefaults({
   message: colorize("blackBright", `Chat API: `),
 });
+
+const MAX_INLINE_IMAGE_BYTES =
+  Number.parseInt(process.env.INLINE_IMAGE_MAX_BYTES ?? "", 10) ||
+  2 * 1024 * 1024; // 2 MB default to accommodate stricter providers
+
+const MAX_INLINE_IMAGE_PIXELS =
+  Number.parseInt(process.env.INLINE_IMAGE_MAX_PIXELS ?? "", 10) || 1_200_000; // ~1.2MP default
+
+const maybeOptimizeImageForInline = async (
+  buffer: Buffer,
+  contentType?: string | null,
+) => {
+  if (!contentType?.startsWith("image/")) {
+    return { buffer, contentType };
+  }
+
+  if (buffer.byteLength <= MAX_INLINE_IMAGE_BYTES) {
+    return { buffer, contentType };
+  }
+
+  try {
+    const sharp = (await import("sharp")).default;
+    const base = sharp(buffer, { failOnError: false });
+    const metadata = await base.metadata();
+
+    if ((metadata.width ?? 0) === 0 || (metadata.height ?? 0) === 0) {
+      return { buffer, contentType };
+    }
+
+    const pixelCount = (metadata.width ?? 0) * (metadata.height ?? 0);
+    let scale = 1;
+    if (pixelCount > MAX_INLINE_IMAGE_PIXELS) {
+      scale = Math.sqrt(MAX_INLINE_IMAGE_PIXELS / pixelCount);
+    }
+
+    const targetDimensions = () => {
+      if (scale >= 1) {
+        return undefined;
+      }
+      const targetWidth = Math.max(
+        1,
+        Math.floor((metadata.width ?? 0) * scale),
+      );
+      const targetHeight = Math.max(
+        1,
+        Math.floor((metadata.height ?? 0) * scale),
+      );
+      return { width: targetWidth, height: targetHeight };
+    };
+
+    const qualities = [75, 65, 55, 45];
+    let best: { data: Buffer; info?: { format?: string } | null } | null = null;
+    for (const quality of qualities) {
+      let attempt = sharp(buffer, { failOnError: false });
+      if (scale < 1) {
+        const dims = targetDimensions();
+        if (dims) {
+          attempt = attempt.resize({
+            width: dims.width,
+            height: dims.height,
+            fit: "inside",
+            withoutEnlargement: true,
+          });
+        }
+      }
+
+      const { data, info } = await attempt
+        .webp({ quality })
+        .toBuffer({ resolveWithObject: true });
+
+      if (!best || data.length < best.data.length) {
+        best = { data, info };
+      }
+
+      if (data.length <= MAX_INLINE_IMAGE_BYTES) {
+        return {
+          buffer: data,
+          contentType: info?.format ? `image/${info.format}` : "image/webp",
+        };
+      }
+    }
+
+    if (best && best.data.length < buffer.byteLength) {
+      return {
+        buffer: best.data,
+        contentType: best.info?.format
+          ? `image/${best.info.format}`
+          : "image/webp",
+      };
+    }
+
+    return { buffer, contentType };
+  } catch (error) {
+    logger.error("Failed to optimize inline image for provider", error);
+    return { buffer, contentType };
+  }
+};
+
+const inlineFilePartsAsDataUrls = async (
+  messages: UIMessage[],
+): Promise<UIMessage[]> => {
+  const cache = new Map<
+    string,
+    { base64: string; contentType?: string | null }
+  >();
+
+  const transformPart = async (part: UIMessage["parts"][number]) => {
+    if (part.type !== "file") {
+      return part;
+    }
+
+    if (part.url.startsWith("data:")) {
+      return part;
+    }
+
+    const providerMetadata = part.providerMetadata as
+      | Record<string, { storageKey?: string; storageUrl?: string }>
+      | undefined;
+    const storageMetadata = providerMetadata?.["better-chatbot"];
+    const storageKey =
+      storageMetadata?.storageKey ?? extractStorageKeyFromUrl(part.url);
+
+    if (!storageKey) {
+      return part;
+    }
+
+    try {
+      let cached = cache.get(storageKey);
+      if (!cached) {
+        const [buffer, metadata] = await Promise.all([
+          serverFileStorage.download(storageKey),
+          serverFileStorage.getMetadata(storageKey),
+        ]);
+        const optimized = await maybeOptimizeImageForInline(
+          buffer,
+          metadata?.contentType,
+        );
+        cached = {
+          base64: optimized.buffer.toString("base64"),
+          contentType: optimized.contentType ?? metadata?.contentType,
+        };
+        cache.set(storageKey, cached);
+      }
+
+      const contentType =
+        part.mediaType || cached.contentType || "application/octet-stream";
+
+      return {
+        ...part,
+        url: `data:${contentType};base64,${cached.base64}`,
+      };
+    } catch (error) {
+      if (error instanceof FileNotFoundError) {
+        logger.warn(
+          `File not found in storage while preparing provider payload: ${storageKey}`,
+        );
+        return part;
+      }
+      logger.error(
+        `Failed to inline storage file for provider: ${storageKey}`,
+        error,
+      );
+      return part;
+    }
+  };
+
+  return Promise.all(
+    messages.map(async (message) => ({
+      ...message,
+      parts: await Promise.all(message.parts.map(transformPart)),
+    })),
+  );
+};
 
 export async function POST(request: Request) {
   try {
@@ -255,10 +431,12 @@ export async function POST(request: Request) {
         }
         logger.info(`model: ${chatModel?.provider}/${chatModel?.model}`);
 
+        const providerMessages = await inlineFilePartsAsDataUrls(messages);
+
         const result = streamText({
           model,
           system: systemPrompt,
-          messages: convertToModelMessages(messages),
+          messages: convertToModelMessages(providerMessages),
           experimental_transform: smoothStream({ chunking: "word" }),
           maxRetries: 2,
           tools: vercelAITooles,

@@ -11,6 +11,8 @@ import { ArchiveWithItemCount } from "app-types/archive";
 export interface UploadedFile {
   id: string;
   url: string;
+  storageUrl?: string;
+  storageKey?: string;
   name: string;
   mimeType: string;
   size: number;

@@ -259,6 +259,8 @@ export default function PromptInput({
                   ? {
                       ...f,
                       url: uploadedFile.url,
+                      storageUrl: uploadedFile.storageUrl,
+                      storageKey: uploadedFile.pathname,
                       isUploading: false,
                       progress: 100,
                     }
@@ -431,6 +433,20 @@ export default function PromptInput({
               type: "file",
               url: file.url || file.dataUrl || "",
               mediaType: file.mimeType,
+              filename: file.name,
+              providerMetadata:
+                file.storageKey || file.storageUrl
+                  ? {
+                      "better-chatbot": {
+                        ...(file.storageKey
+                          ? { storageKey: file.storageKey }
+                          : {}),
+                        ...(file.storageUrl
+                          ? { storageUrl: file.storageUrl }
+                          : {}),
+                      },
+                    }
+                  : undefined,
             }) as FileUIPart,
         ),
         {
