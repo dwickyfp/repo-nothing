@@ -610,15 +610,7 @@ export default function PromptInput({
                             className="cursor-pointer"
                           >
                             <GeminiIcon className="mr-2 size-4" />
-                            OpenRouter Gemini 2.5 Flash Image
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            disabled={modelInfo?.isToolCallUnsupported}
-                            onClick={() => handleGenerateImage("openai")}
-                            className="cursor-pointer"
-                          >
-                            <OpenAIIcon className="mr-2 size-4" />
-                            OpenAI
+                            Gemini 2.5 Flash Image
                           </DropdownMenuItem>
                         </DropdownMenuSubContent>
                       </DropdownMenuPortal>
